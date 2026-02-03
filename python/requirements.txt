@@ -1,0 +1,40 @@
+# Core dependencies
+pandas==2.1.4
+numpy==1.26.2
+scipy==1.11.4
+
+# Machine Learning
+scikit-learn==1.3.2
+xgboost==2.0.3
+lightgbm==4.1.0
+
+# Deep Learning for sentiment
+torch==2.1.2
+transformers==4.36.2
+
+# NLP
+nltk==3.8.1
+vaderSentiment==3.3.2
+
+# Data fetching
+requests==2.31.0
+tweepy==4.14.0
+praw==7.7.1
+
+# Database
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.23
+
+# API
+fastapi==0.108.0
+uvicorn==0.25.0
+pydantic==2.5.3
+
+# Utilities
+python-dotenv==1.0.0
+pyyaml==6.0.1
+redis==5.0.1
+
+# Backtesting
+backtrader==1.9.78.123
+matplotlib==3.8.2

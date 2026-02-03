@@ -1,0 +1,33 @@
+# Python ML pipeline Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY python/requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Download NLTK data
+RUN python -c "import nltk; nltk.download('vader_lexicon'); nltk.download('punkt')"
+
+# Copy application code
+COPY python/ .
+
+# Create models directory
+RUN mkdir -p /app/models
+
+# Expose FastAPI port
+EXPOSE 8000
+
+# Run ML pipeline server
+CMD ["uvicorn", "ml_pipeline.api:app", "--host", "0.0.0.0", "--port", "8000"]

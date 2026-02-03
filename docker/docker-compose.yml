@@ -1,0 +1,154 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with TimescaleDB
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: polymarket_db
+    environment:
+      POSTGRES_DB: polymarket_bot
+      POSTGRES_USER: trading_bot
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_HOST_AUTH_METHOD: md5
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trading_bot -d polymarket_bot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - trading_network
+
+  # Redis for caching and message queue
+  redis:
+    image: redis:7-alpine
+    container_name: polymarket_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - trading_network
+
+  # Rust trading bot
+  trading-bot:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.rust
+    container_name: polymarket_trading_bot
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TRADING_BOT__DATABASE__URL: postgresql://trading_bot:${DB_PASSWORD:-changeme}@postgres:5432/polymarket_bot
+      TRADING_BOT__REDIS__URL: redis://redis:6379
+      TRADING_BOT__BLOCKCHAIN__PRIVATE_KEY: ${PRIVATE_KEY}
+      TRADING_BOT__BLOCKCHAIN__POLYGON_RPC_URL: ${POLYGON_RPC_URL}
+      TRADING_BOT__BLOCKCHAIN__POLYGON_WS_URL: ${POLYGON_WS_URL}
+      RUST_LOG: info
+    volumes:
+      - ../config:/app/config:ro
+    networks:
+      - trading_network
+    restart: unless-stopped
+
+  # Python ML pipeline
+  ml-pipeline:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.python
+    container_name: polymarket_ml_pipeline
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      DATABASE_URL: postgresql://trading_bot:${DB_PASSWORD:-changeme}@postgres:5432/polymarket_bot
+      REDIS_URL: redis://redis:6379
+      TWITTER_BEARER_TOKEN: ${TWITTER_BEARER_TOKEN}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../python:/app
+      - ml_models:/app/models
+    networks:
+      - trading_network
+    restart: unless-stopped
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: polymarket_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - trading_network
+    restart: unless-stopped
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: polymarket_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-clock-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    networks:
+      - trading_network
+    restart: unless-stopped
+
+  # PgAdmin for database management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: polymarket_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@polymarket.local
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - trading_network
+    profiles:
+      - dev
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  pgadmin_data:
+  ml_models:
+
+networks:
+  trading_network:
+    driver: bridge

@@ -1,0 +1,60 @@
+# Default Configuration for Polymarket Trading Bot
+
+database:
+  url: "postgresql://trading_bot:password@localhost:5432/polymarket_bot"
+  max_connections: 10
+  min_connections: 2
+  connection_timeout: 30
+
+redis:
+  url: "redis://localhost:6379"
+  pool_size: 10
+
+blockchain:
+  polygon_rpc_url: "https://polygon-rpc.com"
+  polygon_ws_url: "wss://polygon-rpc.com"
+  private_key: ""  # Set via environment variable
+  gas_limit: 500000
+  max_gas_price_gwei: 100
+
+polymarket:
+  api_url: "https://api.polymarket.com"
+  ws_url: "wss://ws.polymarket.com"
+  api_key: ""
+  ctf_exchange_address: "0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E"
+  conditional_tokens_address: "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"
+
+strategies:
+  enabled_strategies:
+    - "clv_arb"
+    - "poisson_ev"
+  
+  clv_arb:
+    min_divergence_pct: 3.0
+    exit_on_convergence: true
+    max_hold_hours: 24
+  
+  poisson_ev:
+    min_edge_pct: 5.0
+    simulation_count: 10000
+    min_significance: 0.95
+  
+  news_scalp:
+    execution_timeout_seconds: 60
+    exit_after_minutes: 15
+    twitter_bearer_token: ""
+
+risk:
+  starting_capital: 50000.0
+  max_position_size_pct: 2.0
+  daily_drawdown_limit_pct: 8.0
+  max_correlation: 0.6
+  min_market_liquidity: 5000.0
+  max_daily_trades: 20
+  kelly_fraction: 0.5
+
+monitoring:
+  metrics_port: 9090
+  dashboard_port: 3000
+  telegram_bot_token: ""
+  telegram_chat_id: ""

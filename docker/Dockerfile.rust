@@ -1,0 +1,40 @@
+# Multi-stage build for Rust trading bot
+FROM rust:1.75 as builder
+
+WORKDIR /app
+
+# Copy manifests
+COPY Cargo.toml Cargo.lock ./
+
+# Build dependencies only (cache layer)
+RUN mkdir src && \
+    echo "fn main() {}" > src/main.rs && \
+    cargo build --release && \
+    rm -rf src
+
+# Copy source code
+COPY src ./src
+
+# Build application
+RUN cargo build --release
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+RUN apt-get update && \
+    apt-get install -y ca-certificates libssl3 libpq5 && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=builder /app/target/release/trading-bot /app/trading-bot
+
+# Create config directory
+RUN mkdir -p /app/config
+
+# Expose metrics port
+EXPOSE 9090
+
+# Run the binary
+CMD ["/app/trading-bot"]
